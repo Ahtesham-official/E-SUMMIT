@@ -17,9 +17,41 @@ const KONFHUB_EVENT_ID   = process.env.KONFHUB_EVENT_ID;
 const RAW_TICKET_ID          = process.env.KONFHUB_TCET_TICKET_ID || '122834';
 const KONFHUB_TCET_TICKET_ID = RAW_TICKET_ID.split('|')[0].replace(/[^0-9]/g, '');
 
+// ── Allowed origins for CORS ──────────────────────────────────────────────────
+const defaultAllowedOrigins = [
+  'https://e-summit-seven.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5174',
+];
+
+const envFrontendUrl = process.env.FRONTEND_URL;
+if (envFrontendUrl) {
+  envFrontendUrl.split(',').forEach((url) => {
+    const trimmed = url.trim();
+    if (trimmed && !defaultAllowedOrigins.includes(trimmed)) {
+      defaultAllowedOrigins.push(trimmed);
+    }
+  });
+}
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, server-to-server, or curl)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.replace(/\/$/, '');
+    const isAllowed =
+      defaultAllowedOrigins.some((allowed) => allowed.replace(/\/$/, '') === cleanOrigin) ||
+      /\.vercel\.app$/.test(cleanOrigin);
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS error: Origin ${origin} not allowed`));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
