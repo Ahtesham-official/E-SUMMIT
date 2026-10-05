@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react'
 import '../index.css'
 import { gsap } from 'gsap'
+import { useAuth } from '../context/AuthContext'
+import { useClerk } from '@clerk/react'
+import { LogIn, LogOut, ChevronDown, User } from 'lucide-react'
 
-const Navbar = ({ animate }) => {
+const Navbar = ({ animate, onRegisterClick }) => {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [userDropOpen, setUserDropOpen] = useState(false)
   const navRef = useRef(null)
+  const dropRef = useRef(null)
+
+  const { isSignedIn, currentUserName, currentUserEmail, logout, loginWithClerk, isLoaded } = useAuth()
+  const { openUserProfile } = useClerk()
 
   useEffect(() => {
     if (!animate) return
@@ -15,6 +23,17 @@ const Navbar = ({ animate }) => {
     )
   }, [animate])
 
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropRef.current && !dropRef.current.contains(e.target)) {
+        setUserDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const links = [
     { label: 'Home', href: '#hero' },
     { label: 'About', href: '#about' },
@@ -24,6 +43,8 @@ const Navbar = ({ animate }) => {
     { label: 'Partners', href: '#partners' },
     { label: 'FAQ', href: '#faq' },
   ]
+
+  const avatarInitial = currentUserName ? currentUserName.charAt(0).toUpperCase() : '?'
 
   return (
     <nav ref={navRef} className='fixed top-0 left-0 w-full h-[10vh] nav z-50 flex items-center justify-between px-6 md:px-10' style={{ opacity: 0 }}>
@@ -39,9 +60,70 @@ const Navbar = ({ animate }) => {
             {link.label}
           </a>
         ))}
-        <button className='redBg text-white px-5 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity whitespace-nowrap'>
+
+        {/* Register Now button */}
+        <button
+          id="navbar-register-btn"
+          onClick={onRegisterClick}
+          className='redBg text-white px-5 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity whitespace-nowrap'
+        >
           Register Now &gt;
         </button>
+
+        {/* Auth area */}
+        {!isLoaded ? (
+          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+        ) : isSignedIn ? (
+          /* Signed-in user pill with dropdown */
+          <div className="relative" ref={dropRef}>
+            <button
+              id="navbar-user-btn"
+              onClick={() => setUserDropOpen(!userDropOpen)}
+              className="flex items-center gap-2 bg-[#0E2044]/10 hover:bg-[#0E2044]/20 transition-colors px-3 py-1.5 rounded-full"
+            >
+              <div className="w-7 h-7 rounded-full navyBg text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {avatarInitial}
+              </div>
+              <span className="text-[#0E2044] font-semibold text-sm max-w-[120px] truncate">
+                {currentUserName}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-[#0E2044] transition-transform ${userDropOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {userDropOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Signed in as</p>
+                  <p className="text-sm font-semibold text-[#0E2044] truncate mt-0.5">{currentUserName}</p>
+                  <p className="text-xs text-gray-500 truncate">{currentUserEmail}</p>
+                </div>
+                <button
+                  onClick={() => { openUserProfile(); setUserDropOpen(false) }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0E2044] hover:bg-gray-50 transition-colors"
+                >
+                  <User className="w-4 h-4" /> Manage Account
+                </button>
+                <button
+                  id="navbar-signout-btn"
+                  onClick={() => { logout(); setUserDropOpen(false) }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Sign In button */
+          <button
+            id="navbar-signin-btn"
+            onClick={loginWithClerk}
+            className="flex items-center gap-2 border border-[#0E2044] text-[#0E2044] px-4 py-1.5 rounded-lg font-semibold text-sm hover:bg-[#0E2044] hover:text-white transition-all"
+          >
+            <LogIn className="w-4 h-4" />
+            Sign In
+          </button>
+        )}
       </div>
 
       {/* Mobile Hamburger */}
@@ -62,9 +144,38 @@ const Navbar = ({ animate }) => {
             {link.label}
           </a>
         ))}
-        <button className='redBg text-white px-8 py-3 rounded-lg font-bold w-max'>
+        <button
+          onClick={() => { onRegisterClick(); setMenuOpen(false) }}
+          className='redBg text-white px-8 py-3 rounded-lg font-bold w-max'
+        >
           Register Now &gt;
         </button>
+
+        {isLoaded && (
+          isSignedIn ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full navyBg text-white flex items-center justify-center text-sm font-bold">
+                  {avatarInitial}
+                </div>
+                <span className="font-semibold text-[#0E2044]">{currentUserName}</span>
+              </div>
+              <button
+                onClick={() => { logout(); setMenuOpen(false) }}
+                className="flex items-center gap-2 text-red-600 font-semibold text-sm border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { loginWithClerk(); setMenuOpen(false) }}
+              className="flex items-center gap-2 border border-[#0E2044] text-[#0E2044] px-6 py-2.5 rounded-lg font-semibold hover:bg-[#0E2044] hover:text-white transition-all"
+            >
+              <LogIn className="w-4 h-4" /> Sign In
+            </button>
+          )
+        )}
       </div>
     </nav>
   )

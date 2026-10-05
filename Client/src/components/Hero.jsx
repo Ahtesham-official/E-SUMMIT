@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import BackgroundRibbon from '../assets/Images/ESUMMIT-RIBBON.png';
 import Calender from '../assets/Images/calendar.svg';
 
-const Hero = ({ animate }) => {
+const Hero = ({ animate, onRegisterClick }) => {
   const ribbonRef = useRef(null);
   const labelRef = useRef(null);
   const titleRef = useRef(null);
@@ -81,10 +81,16 @@ const Hero = ({ animate }) => {
         </p>
 
         <div ref={buttonsRef} className="mt-6 md:mt-8 flex flex-wrap gap-4" style={{ opacity: 0 }}>
-          <button className="navyBg text-white px-6 sm:px-8 py-3 rounded text-xs sm:text-sm font-semibold hover:opacity-90 transition-opacity">
-            EXPLORE E-SUMMIT -&gt;
+          <button
+            className="navyBg text-white px-6 sm:px-8 py-3 rounded text-xs sm:text-sm font-semibold hover:opacity-90 transition-opacity"
+            onClick={onRegisterClick}
+          >
+            EXPLORE &amp; REGISTER -&gt;
           </button>
-          <button className="bg-transparent border border-gray-400 text-[#0E2044] px-6 sm:px-8 py-3 rounded text-xs sm:text-sm font-semibold hover:bg-gray-50 transition-colors">
+          <button
+            className="bg-transparent border border-gray-400 text-[#0E2044] px-6 sm:px-8 py-3 rounded text-xs sm:text-sm font-semibold hover:bg-gray-50 transition-colors"
+            onClick={onRegisterClick}
+          >
             REGISTER NOW -&gt;
           </button>
         </div>
