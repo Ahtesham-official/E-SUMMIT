@@ -11,7 +11,7 @@ const ScheduleAndPartners = () => {
   ];
 
   return (
-    <section id="schedule" className="w-full h-screen bg-[#E8DDDC] flex flex-col justify-center px-6 sm:px-10 md:px-16 pt-[10vh] border-t border-gray-200 overflow-auto">
+    <section id="schedule" className="w-full bg-[#E8DDDC] flex flex-col justify-center px-6 sm:px-10 md:px-16 py-16 md:py-24 border-t border-gray-200">
       <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16">
 
         {/* Left Side - Schedule & Partners */}

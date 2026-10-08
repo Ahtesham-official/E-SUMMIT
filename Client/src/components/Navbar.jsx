@@ -4,12 +4,15 @@ import { gsap } from 'gsap'
 import { useAuth } from '../context/AuthContext'
 import { useClerk } from '@clerk/react'
 import { LogIn, LogOut, ChevronDown, User } from 'lucide-react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 const Navbar = ({ animate, onRegisterClick }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
   const navRef = useRef(null)
   const dropRef = useRef(null)
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const { isSignedIn, currentUserName, currentUserEmail, logout, loginWithClerk, isLoaded } = useAuth()
   const { openUserProfile } = useClerk()
@@ -34,14 +37,22 @@ const Navbar = ({ animate, onRegisterClick }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleNavClick = (e, href) => {
+    if (href.startsWith('#')) {
+      if (location.pathname !== '/') {
+        e.preventDefault()
+        navigate('/' + href)
+      }
+    }
+  }
+
   const links = [
-    { label: 'Home', href: '#hero' },
-    { label: 'About', href: '#about' },
-    { label: 'Events', href: '#what-to-expect' },
-    { label: 'Speakers', href: '#speakers' },
-    { label: 'Schedule', href: '#schedule' },
-    { label: 'Partners', href: '#partners' },
-    { label: 'FAQ', href: '#faq' },
+    { label: 'Home', href: '/' },
+    { label: 'About', href: '/#about' },
+    { label: 'Events', href: '/#what-to-expect' },
+    { label: 'Speakers', href: '/speakers' },
+    { label: 'Schedule', href: '/#schedule' },
+    { label: 'Partners', href: '/#partners' },
   ]
 
   const avatarInitial = currentUserName ? currentUserName.charAt(0).toUpperCase() : '?'
@@ -49,17 +60,24 @@ const Navbar = ({ animate, onRegisterClick }) => {
   return (
     <nav ref={navRef} className='fixed top-0 left-0 w-full h-[10vh] nav z-50 flex items-center justify-between px-6 md:px-10' style={{ opacity: 0 }}>
       {/* Logo */}
-      <div className="flex items-center">
-        <h1 className="text-[#0E2044] font-extrabold text-xl tracking-wide">ESUMMIT</h1>
-      </div>
+      <Link to="/" className="flex items-center">
+        <h1 className="text-[#0E2044] font-extrabold text-xl tracking-wide cursor-pointer">ESUMMIT</h1>
+      </Link>
 
       {/* Desktop Links */}
       <div className="hidden md:flex items-center gap-6 lg:gap-8 navy font-[500] text-sm">
         {links.map(link => (
-          <a key={link.label} href={link.href} className="hover:text-red-600 transition-colors">
-            {link.label}
-          </a>
+          link.href.startsWith('/') && !link.href.includes('#') ? (
+            <Link key={link.label} to={link.href} className="hover:text-red-600 transition-colors">
+              {link.label}
+            </Link>
+          ) : (
+            <a key={link.label} href={link.href} onClick={(e) => handleNavClick(e, link.href.replace('/', ''))} className="hover:text-red-600 transition-colors">
+              {link.label}
+            </a>
+          )
         ))}
+
 
         {/* Register Now button */}
         <button
