@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/__clerk/(.*)",
+      "destination": "https://clerk.e-summit-seven.vercel.app/__clerk/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
