@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1057 262" width="1057" height="262">
+
+  <!-- Sparkle -->
+  <path d="M117 6 Q119 22 123 25 Q119 28 117 44 Q115 28 111 25 Q115 22 117 6 Z" fill="#111"/>
+
+  <!-- Orbit ring (back part) -->
+  <path d="M40 120 C 38 85, 62 62, 96 60" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Bars forming the bulb -->
+  <defs>
+    <mask id="barcuts" maskUnits="userSpaceOnUse" x="60" y="60" width="90" height="140">
+      <rect x="60" y="60" width="90" height="140" fill="#fff"/>
+      <g fill="#000">
+        <rect x="76" y="120" width="1.6" height="68"/>
+        <rect x="89" y="102" width="1.6" height="86"/>
+        <rect x="102" y="84" width="1.6" height="104"/>
+        <rect x="117" y="70" width="1.6" height="118"/>
+      </g>
+    </mask>
+  </defs>
+  <g fill="#111" mask="url(#barcuts)">
+    <rect x="71" y="118" width="10" height="72"/>
+    <rect x="84" y="100" width="10" height="90"/>
+    <rect x="97" y="82" width="11" height="108"/>
+    <rect x="111" y="68" width="13" height="122"/>
+    <rect x="127" y="76" width="6" height="104"/>
+  </g>
+
+  <!-- Bulb lower curve + base -->
+  <path d="M72 190 Q 80 205 100 208 L 124 208 Q 136 202 134 182" fill="none" stroke="#111" stroke-width="3"/>
+  <g fill="#111">
+    <rect x="86" y="212" width="38" height="4" rx="2"/>
+    <rect x="88" y="219" width="34" height="4" rx="2"/>
+    <rect x="92" y="226" width="26" height="4" rx="2"/>
+    <path d="M97 232 h16 q-3 6 -8 6 q-5 0 -8 -6z"/>
+  </g>
+
+  <!-- Orbit ring (front part) -->
+  <path d="M42 150 C 46 178, 100 190, 150 150 C 168 135, 172 118, 160 108" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- TCET'S -->
+  <text x="176" y="78" font-family="'Montserrat','Helvetica Neue',Arial,sans-serif" font-size="36" font-weight="400" fill="#222" textLength="182" lengthAdjust="spacing">TCET’S</text>
+  <line x1="381" y1="65" x2="711" y2="65" stroke="#333" stroke-width="1.5"/>
+
+  <!-- E-SUMMiT -->
+  <text x="176" y="214" font-family="'Playfair Display','Bodoni MT','Didot','Bodoni 72',Georgia,serif" font-size="178" font-weight="700" fill="#0d0d0d" textLength="650" lengthAdjust="spacingAndGlyphs">E-SUMMiT</text>
+
+  <!-- '27 -->
+  <text x="829" y="214" font-family="'Playfair Display','Bodoni MT','Didot','Bodoni 72',Georgia,serif" font-size="170" font-weight="700" fill="#c8101e" textLength="212" lengthAdjust="spacingAndGlyphs">’27</text>
+
+  <!-- Tagline -->
+  <line x1="179" y1="239" x2="283" y2="239" stroke="#333" stroke-width="1.5"/>
+  <text x="304" y="248" font-family="'Montserrat','Helvetica Neue',Arial,sans-serif" font-size="22" fill="#222" textLength="530" lengthAdjust="spacing">THINK BEYOND THE OBVIOUS</text>
+  <line x1="859" y1="239" x2="964" y2="239" stroke="#333" stroke-width="1.5"/>
+</svg>

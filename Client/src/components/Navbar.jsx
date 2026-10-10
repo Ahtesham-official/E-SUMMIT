@@ -9,6 +9,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 const Navbar = ({ animate, onRegisterClick }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const navRef = useRef(null)
   const dropRef = useRef(null)
   const navigate = useNavigate()
@@ -16,6 +17,19 @@ const Navbar = ({ animate, onRegisterClick }) => {
 
   const { isSignedIn, currentUserName, currentUserEmail, logout, loginWithClerk, isLoaded } = useAuth()
   const { openUserProfile } = useClerk()
+
+  // Track scroll position to trigger shortened rounded navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setScrolled(true)
+      } else {
+        setScrolled(false)
+      }
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   useEffect(() => {
     if (!animate) return
@@ -58,10 +72,17 @@ const Navbar = ({ animate, onRegisterClick }) => {
   const avatarInitial = currentUserName ? currentUserName.charAt(0).toUpperCase() : '?'
 
   return (
-    <nav ref={navRef} className='fixed top-0 left-0 w-full h-[10vh] nav z-50 flex items-center justify-between px-6 md:px-10' style={{ opacity: 0 }}>
+    <nav
+      ref={navRef}
+      className={`fixed left-0 right-0 z-50 mx-auto flex items-center justify-between transition-all duration-500 ease-in-out ${scrolled
+          ? 'top-3 w-[90%] max-w-6xl h-[8vh] min-h-[56px] rounded-full px-6 md:px-8 bg-white/75 backdrop-blur-2xl border border-white/80 shadow-2xl shadow-[#0E2044]/10'
+          : 'top-0 w-full h-[10vh] min-h-[64px] px-6 md:px-10 nav rounded-none'
+        }`}
+      style={{ opacity: 0 }}
+    >
       {/* Logo */}
       <Link to="/" className="flex items-center">
-        <h1 className="text-[#0E2044] font-extrabold text-xl tracking-wide cursor-pointer">ESUMMIT</h1>
+        <img src="/esummit27-logo.svg" alt="E-SUMMIT Logo" className="h-10 sm:h-12 md:h-14 w-auto max-h-12 md:max-h-14 object-contain cursor-pointer transition-all duration-300" />
       </Link>
 
       {/* Desktop Links */}
@@ -156,7 +177,10 @@ const Navbar = ({ animate, onRegisterClick }) => {
       </button>
 
       {/* Mobile Dropdown */}
-      <div className={`absolute top-[10vh] left-0 w-full nav flex flex-col items-center gap-6 py-8 md:hidden transition-all duration-300 ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`absolute left-0 w-full flex flex-col items-center gap-6 py-8 md:hidden transition-all duration-300 shadow-xl ${scrolled
+          ? 'top-[calc(100%+10px)] bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/80'
+          : 'top-[10vh] nav'
+        } ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         {links.map(link => (
           <a key={link.label} href={link.href} className="navy font-semibold text-lg hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
             {link.label}
