@@ -19,6 +19,8 @@ const request = async (endpoint, options = {}) => {
   if (!response.ok) {
     const error = new Error(data.message || `Request failed with status ${response.status}`);
     error.response = { status: response.status, data };
+    error.status = response.status;
+    error.data = data;
     throw error;
   }
 
@@ -29,15 +31,48 @@ export const apiService = {
   // ── Health ───────────────────────────────────────────────────────────────
   getHealth: () => request('/health'),
 
-  // ── Registrations (Clerk-authenticated) ──────────────────────────────────
-  /**
-   * POST /api/registrations
-   * Requires a Clerk session token.
-   * Backend determines TCET vs non-TCET and acts accordingly.
-   * Never accepts a ticketId from the frontend for the TCET free-pass flow.
-   *
-   * @param {string} clerkToken - JWT from useAuth().getClerkToken()
-   */
+  // ── Tickets Catalogue ───────────────────────────────────────────────────
+  getTickets: (token) => request('/tickets', { method: 'GET', token }),
+
+  // ── Student Eligibility ─────────────────────────────────────────────────
+  getEligibilityStatus: (token) => request('/eligibility/me', { method: 'GET', token }),
+  
+  startEmailVerification: (token, payload) =>
+    request('/eligibility/email/start', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload),
+    }),
+
+  confirmEmailVerification: (token, payload) =>
+    request('/eligibility/email/confirm', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload),
+    }),
+
+  submitStudentIdEvidence: (token, payload) =>
+    request('/eligibility/student-id', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload),
+    }),
+
+  // ── Order Booking ───────────────────────────────────────────────────────
+  createOrder: (token, payload) =>
+    request('/orders', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload),
+    }),
+
+  getOrderStatus: (token, orderId) =>
+    request(`/orders/${orderId}`, {
+      method: 'GET',
+      token,
+    }),
+
+  // ── Legacy Registrations ────────────────────────────────────────────────
   registerForEvent: (clerkToken) =>
     request('/registrations', {
       method: 'POST',

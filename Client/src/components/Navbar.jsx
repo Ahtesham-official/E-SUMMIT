@@ -62,6 +62,7 @@ const Navbar = ({ animate, onRegisterClick }) => {
 
   const links = [
     { label: 'Home', href: '/' },
+    { label: 'Passes', href: '/tickets' },
     { label: 'About', href: '/#about' },
     { label: 'Events', href: '/#what-to-expect' },
     { label: 'Speakers', href: '/speakers' },
