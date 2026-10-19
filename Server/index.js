@@ -100,7 +100,10 @@ async function getVerifiedClerkUser(req) {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) throw new Error('Missing bearer token');
 
-  const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
+  const payload = await verifyToken(token, {
+    secretKey: process.env.CLERK_SECRET_KEY,
+    clockSkewInMs: 60 * 1000 // 60s leeway for clock drift
+  });
   if (!payload || !payload.sub) throw new Error('Invalid Clerk token');
 
   const clerkUser = await clerk.users.getUser(payload.sub);

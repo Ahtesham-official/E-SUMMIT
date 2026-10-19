@@ -98,8 +98,12 @@ const TicketsPage = () => {
     setPurchaseError('');
 
     try {
-      const token = clerkToken || (await getClerkToken());
-      if (!token) throw new Error('Authentication required. Please sign in again.');
+      // Always request a fresh, unexpired token from Clerk before booking
+      const token = await getClerkToken({ skipCache: true }) || (await getClerkToken());
+      if (!token) {
+        loginWithClerk();
+        throw new Error('Your session expired. Please sign in again to complete your booking.');
+      }
 
       // Generate idempotency key for this order attempt
       const idempotencyKey = `esummit_${currentUserEmail}_${ticket.slug}_${Date.now()}`;
@@ -116,7 +120,11 @@ const TicketsPage = () => {
       }
     } catch (err) {
       const msg = err.data?.message || err.message || 'Order execution failed.';
-      setPurchaseError(msg);
+      if (msg.toLowerCase().includes('jwt is expired') || msg.toLowerCase().includes('token')) {
+        setPurchaseError('Your session expired. Please sign in again.');
+      } else {
+        setPurchaseError(msg);
+      }
       if (err.data?.requireStudentVerification) {
         setVerificationModalOpen(true);
       }

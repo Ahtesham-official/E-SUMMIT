@@ -40,11 +40,11 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Returns a fresh Clerk session JWT to attach to backend requests.
-   * Usage: const token = await getClerkToken();
+   * Uses skipCache when needed to prevent expired tokens.
    */
-  const getClerkToken = async () => {
+  const getClerkToken = async (options = {}) => {
     try {
-      return await getToken();
+      return await getToken(options);
     } catch {
       return null;
     }
