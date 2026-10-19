@@ -113,6 +113,12 @@ const TicketsPage = () => {
         idempotencyKey,
       });
 
+      if (res.data?.requiresPaymentGateway && res.data?.checkoutUrl) {
+        // Direct seamless redirect to KonfHub's secure checkout page for this ticket
+        window.location.href = res.data.checkoutUrl;
+        return;
+      }
+
       if (res.data?.success) {
         setPurchaseSuccess(true);
       } else {

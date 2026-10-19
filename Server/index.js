@@ -168,7 +168,14 @@ async function captureKonfHubTicket(name, email, ticketNumericId) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const errMsg = data?.message || data?.error || `KonfHub error ${res.status}`;
+    let errMsg = `KonfHub error ${res.status}`;
+    if (typeof data?.error === 'string') {
+      errMsg = data.error;
+    } else if (data?.error?.error_message) {
+      errMsg = data.error.error_message;
+    } else if (typeof data?.message === 'string') {
+      errMsg = data.message;
+    }
     const error = new Error(errMsg);
     error.status = res.status;
     error.konfhubData = data;
@@ -541,6 +548,19 @@ app.post('/api/orders', async (req, res) => {
           registrationData: konfErr.konfhubData
         });
       }
+
+      // If KonfHub rejects capture because this pass requires online payment gateway checkout:
+      if (ticketConfig.price > 0) {
+        const checkoutUrl = `https://konfhub.com/widget/id/38580027-52e6-43dc-b984-7b86d3a7b56c?ticket_id=${numericTicketId}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`;
+        return res.status(200).json({
+          success: true,
+          requiresPaymentGateway: true,
+          checkoutUrl,
+          ticket: ticketConfig,
+          message: 'Redirecting to secure KonfHub checkout to complete payment...'
+        });
+      }
+
       return res.status(502).json({
         success: false,
         message: 'KonfHub booking failed: ' + konfErr.message
