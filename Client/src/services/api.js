@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+// Normalize: ensure base URL does NOT end with /api so we can add it consistently
+const BASE = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 /**
  * Generic fetch wrapper.
@@ -6,7 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
  */
 const request = async (endpoint, options = {}) => {
   const { token, ...fetchOptions } = options;
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${BASE}/api${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -36,7 +39,7 @@ export const apiService = {
 
   // ── Student Eligibility ─────────────────────────────────────────────────
   getEligibilityStatus: (token) => request('/eligibility/me', { method: 'GET', token }),
-  
+
   startEmailVerification: (token, payload) =>
     request('/eligibility/email/start', {
       method: 'POST',
@@ -53,6 +56,33 @@ export const apiService = {
 
   submitStudentIdEvidence: (token, payload) =>
     request('/eligibility/student-id', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(payload),
+    }),
+
+  // ── Admin Authentication ──────────────────────────────────────────────────
+  adminLogin: (email, password) =>
+    request('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  verifyAdminToken: (token) =>
+    request('/admin/verify-token', {
+      method: 'GET',
+      token,
+    }),
+
+  // ── Admin Verifications ──────────────────────────────────────────────────
+  getAdminVerifications: (token) =>
+    request('/admin/verifications', {
+      method: 'GET',
+      token,
+    }),
+
+  reviewAdminVerification: (token, id, payload) =>
+    request(`/admin/verifications/${id}/review`, {
       method: 'POST',
       token,
       body: JSON.stringify(payload),

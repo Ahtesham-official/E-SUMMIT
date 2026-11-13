@@ -3,7 +3,7 @@ import '../index.css'
 import { gsap } from 'gsap'
 import { useAuth } from '../context/AuthContext'
 import { useClerk } from '@clerk/react'
-import { LogIn, LogOut, ChevronDown, User } from 'lucide-react'
+import { LogIn, LogOut, ChevronDown, User, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 const Navbar = ({ animate, onRegisterClick }) => {
@@ -143,6 +143,13 @@ const Navbar = ({ animate, onRegisterClick }) => {
                 >
                   <User className="w-4 h-4" /> Manage Account
                 </button>
+                <Link
+                  to="/admin"
+                  onClick={() => setUserDropOpen(false)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#0E2044] hover:bg-gray-50 transition-colors"
+                >
+                  <ShieldCheck className="w-4 h-4 text-[#C0202A]" /> Admin Panel
+                </Link>
                 <button
                   id="navbar-signout-btn"
                   onClick={() => { logout(); setUserDropOpen(false) }}

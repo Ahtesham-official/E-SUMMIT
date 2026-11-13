@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import Lenis from 'lenis'
 import './index.css'
 import Navbar from './components/Navbar'
@@ -27,6 +27,7 @@ const MainPage = ({ loading, onRegisterClick }) => (
 const AppContent = () => {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -54,15 +55,19 @@ const AppContent = () => {
     navigate('/tickets')
   }
 
+  const isAdminRoute = location.pathname.startsWith('/admin')
+
   return (
     <div className='relative w-full overflow-x-hidden scroll-smooth font-sans bg-[#E8DDDC] min-h-screen'>
-      <BackgroundCircles />
-      {loading && <LoadingScreen onComplete={() => setLoading(false)} />}
+      {!isAdminRoute && <BackgroundCircles />}
+      {!isAdminRoute && loading && <LoadingScreen onComplete={() => setLoading(false)} />}
 
-      <Navbar
-        animate={!loading}
-        onRegisterClick={handleRegisterClick}
-      />
+      {!isAdminRoute && (
+        <Navbar
+          animate={!loading}
+          onRegisterClick={handleRegisterClick}
+        />
+      )}
 
       <Routes>
         <Route path="/" element={<MainPage loading={loading} onRegisterClick={handleRegisterClick} />} />

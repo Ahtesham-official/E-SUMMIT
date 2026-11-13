@@ -25,6 +25,8 @@ const TicketDetailModal = ({
   purchaseLoading,
   purchaseError,
   purchaseSuccess,
+  checkoutUrl,
+  onClearCheckoutUrl,
 }) => {
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -48,7 +50,7 @@ const TicketDetailModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
       <div
-        className="relative w-full max-w-2xl bg-[#FDFDFE] border border-gray-200 rounded-3xl shadow-2xl overflow-hidden text-[#131014] max-h-[92vh] flex flex-col"
+        className={`relative w-full ${checkoutUrl ? 'max-w-3xl h-[85vh]' : 'max-w-2xl max-h-[92vh]'} bg-[#FDFDFE] border border-gray-200 rounded-3xl shadow-2xl overflow-hidden text-[#131014] flex flex-col transition-all duration-300`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ticket-modal-title"
@@ -60,7 +62,12 @@ const TicketDetailModal = ({
               <span className="text-[#E0B09D] text-xs font-bold tracking-widest uppercase">
                 {ticket.tag || 'Official Pass'}
               </span>
-              {ticket.requiresStudentVerification && (
+              {checkoutUrl && (
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">
+                  Direct Secure Checkout
+                </span>
+              )}
+              {ticket.requiresStudentVerification && !checkoutUrl && (
                 <span className="bg-amber-400/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300/30">
                   Student Verification Required
                 </span>
@@ -74,9 +81,16 @@ const TicketDetailModal = ({
           <div className="flex items-center gap-4">
             <div className="text-right">
               <span className="text-[10px] text-gray-300 uppercase tracking-widest block font-medium">Price</span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-[#E0B09D]">
-                {ticket.price === 0 ? 'Free' : `₹${ticket.price.toLocaleString('en-IN')}`}
-              </span>
+              <div className="flex items-baseline gap-1.5 justify-end flex-wrap">
+                {ticket.originalPrice && ticket.originalPrice > ticket.price && (
+                  <span className="text-sm font-semibold text-gray-400 line-through">
+                    ₹{ticket.originalPrice.toLocaleString('en-IN')}
+                  </span>
+                )}
+                <span className="text-2xl sm:text-3xl font-extrabold text-[#E0B09D]">
+                  {ticket.price === 0 ? 'Free' : `₹${ticket.price.toLocaleString('en-IN')}`}
+                </span>
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -88,9 +102,32 @@ const TicketDetailModal = ({
           </div>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
-          {/* Success State */}
+        {/* Scrollable Body / Embedded Widget */}
+        {checkoutUrl ? (
+          <div className="flex-1 w-full h-full flex flex-col relative bg-white">
+            <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-xs px-6">
+              <span className="text-gray-600 flex items-center gap-1.5 font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                Complete payment directly below to secure your <strong>{ticket.name}</strong>
+              </span>
+              <button
+                onClick={onClearCheckoutUrl}
+                className="text-gray-500 hover:text-gray-900 underline text-[11px]"
+              >
+                Back to ticket details
+              </button>
+            </div>
+            <iframe
+              src={checkoutUrl}
+              id="konfhub-widget"
+              title={`Register for ${ticket.name}`}
+              className="w-full flex-1 border-0"
+              allow="payment"
+            />
+          </div>
+        ) : (
+          <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
+            {/* Success State */}
           {purchaseSuccess ? (
             <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-6 text-center space-y-4">
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
@@ -185,9 +222,10 @@ const TicketDetailModal = ({
             </>
           )}
         </div>
+      )}
 
         {/* Footer Actions */}
-        {!purchaseSuccess && (
+        {!purchaseSuccess && !checkoutUrl && (
           <div className="p-6 bg-gray-50/90 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
             <div className="text-xs text-gray-500 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />

@@ -42,6 +42,7 @@ const TicketsPage = () => {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState('');
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState('');
   const [clerkToken, setClerkToken] = useState(null);
 
   // Fetch tickets and verification status
@@ -85,6 +86,7 @@ const TicketsPage = () => {
     setSelectedTicket(ticket);
     setPurchaseError('');
     setPurchaseSuccess(false);
+    setCheckoutUrl('');
     setDetailModalOpen(true);
   };
 
@@ -114,8 +116,8 @@ const TicketsPage = () => {
       });
 
       if (res.data?.requiresPaymentGateway && res.data?.checkoutUrl) {
-        // Direct seamless redirect to KonfHub's secure checkout page for this ticket
-        window.location.href = res.data.checkoutUrl;
+        // Render the quick registration widget embedded directly inside the modal
+        setCheckoutUrl(res.data.checkoutUrl);
         return;
       }
 
@@ -335,12 +337,22 @@ const TicketsPage = () => {
                         {t.shortDescription || t.description}
                       </p>
 
-                      <div className="flex items-baseline gap-1 my-3">
+                      <div className="flex items-baseline gap-2 my-3 flex-wrap">
+                        {t.originalPrice && t.originalPrice > t.price && (
+                          <span className="text-sm sm:text-base font-semibold text-gray-400 line-through">
+                            ₹{t.originalPrice.toLocaleString('en-IN')}
+                          </span>
+                        )}
                         <span className="text-3xl sm:text-4xl font-extrabold text-[#0E2044] tracking-tight">
                           {t.price === 0 ? 'Free' : `₹${t.price.toLocaleString('en-IN')}`}
                         </span>
                         {t.price > 0 && (
                           <span className="text-[11px] text-gray-500 font-medium">/ attendee</span>
+                        )}
+                        {t.originalPrice && t.originalPrice > t.price && (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">
+                            {Math.round(((t.originalPrice - t.price) / t.originalPrice) * 100)}% OFF
+                          </span>
                         )}
                       </div>
                     </div>
@@ -374,7 +386,10 @@ const TicketsPage = () => {
       {/* Reusable Floating Ticket Details Modal */}
       <TicketDetailModal
         isOpen={detailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
+        onClose={() => {
+          setDetailModalOpen(false);
+          setCheckoutUrl('');
+        }}
         ticket={selectedTicket}
         onPurchase={handlePurchase}
         onOpenVerification={() => {
@@ -386,6 +401,8 @@ const TicketsPage = () => {
         purchaseLoading={purchaseLoading}
         purchaseError={purchaseError}
         purchaseSuccess={purchaseSuccess}
+        checkoutUrl={checkoutUrl}
+        onClearCheckoutUrl={() => setCheckoutUrl('')}
       />
 
       {/* Student Eligibility Verification Modal */}
