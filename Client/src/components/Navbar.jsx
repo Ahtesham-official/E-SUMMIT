@@ -40,6 +40,15 @@ const Navbar = ({ animate, onRegisterClick }) => {
     )
   }, [animate])
 
+  useEffect(() => {
+    if (!location.hash) return
+    const sectionId = decodeURIComponent(location.hash.slice(1))
+    const frameId = requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [location.pathname, location.hash])
+
   // Close user dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -183,9 +192,28 @@ const Navbar = ({ animate, onRegisterClick }) => {
           : 'top-[10vh] nav'
         } ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         {links.map(link => (
-          <a key={link.label} href={link.href} className="navy font-semibold text-lg hover:text-red-600 transition-colors" onClick={() => setMenuOpen(false)}>
-            {link.label}
-          </a>
+          link.href.startsWith('/') && !link.href.includes('#') ? (
+            <Link
+              key={link.label}
+              to={link.href}
+              className="navy font-semibold text-lg hover:text-red-600 transition-colors"
+              onClick={() => setMenuOpen(false)}
+            >
+              {link.label}
+            </Link>
+          ) : (
+            <a
+              key={link.label}
+              href={link.href}
+              className="navy font-semibold text-lg hover:text-red-600 transition-colors"
+              onClick={(e) => {
+                handleNavClick(e, link.href.replace('/', ''))
+                setMenuOpen(false)
+              }}
+            >
+              {link.label}
+            </a>
+          )
         ))}
         <button
           onClick={() => { onRegisterClick(); setMenuOpen(false) }}

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ScheduleAndPartners = () => {
+const ScheduleAndPartners = ({ onRegisterClick }) => {
   const schedule = [
     { time: '10:00 AM', event: 'OPENING CEREMONY' },
     { time: '11:30 AM', event: 'FOUNDER TALK' },
@@ -62,7 +62,7 @@ const ScheduleAndPartners = () => {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#0E2044] mb-4 relative z-10 leading-tight">
               READY TO BUILD<br/>WHAT'S NEXT?
             </h2>
-            <button className="mt-4 md:mt-6 bg-red-600 text-white px-6 md:px-8 py-3 rounded text-sm font-semibold hover:bg-red-700 transition-colors relative z-10 shadow-lg">
+            <button onClick={onRegisterClick} className="mt-4 md:mt-6 bg-red-600 text-white px-6 md:px-8 py-3 rounded text-sm font-semibold hover:bg-red-700 transition-colors relative z-10 shadow-lg">
               REGISTER NOW -&gt;
             </button>
           </div>
@@ -71,13 +71,13 @@ const ScheduleAndPartners = () => {
             <p className="font-bold text-[#0E2044] text-base">E-SUMMIT 2027</p>
             <p>EDIC - TCET Entrepreneurship Cell</p>
             <div className="flex gap-4 text-lg">
-              <a href="#" className="hover:text-[#0E2044] transition-colors">in</a>
-              <a href="#" className="hover:text-[#0E2044] transition-colors">📷</a>
-              <a href="#" className="hover:text-[#0E2044] transition-colors">✉</a>
+              <a href="#" onClick={(event) => event.preventDefault()} className="hover:text-[#0E2044] transition-colors">in</a>
+              <a href="#" onClick={(event) => event.preventDefault()} className="hover:text-[#0E2044] transition-colors">📷</a>
+              <a href="#" onClick={(event) => event.preventDefault()} className="hover:text-[#0E2044] transition-colors">✉</a>
             </div>
             <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-300/60 text-xs">
-              <a href="#" className="hover:text-[#0E2044] transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-[#0E2044] transition-colors">Terms &amp; Conditions</a>
+              <a href="#" onClick={(event) => event.preventDefault()} className="hover:text-[#0E2044] transition-colors">Privacy Policy</a>
+              <a href="#" onClick={(event) => event.preventDefault()} className="hover:text-[#0E2044] transition-colors">Terms &amp; Conditions</a>
             </div>
           </div>
         </div>
