@@ -29,18 +29,78 @@ function extractNumericTicketId(rawId) {
 
 const KONFHUB_TCET_TICKET_ID = extractNumericTicketId(RAW_TCET_TICKET_ID);
 
+// ── Groq OCR & AI Verification Config ─────────────────────────────────────────
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_OCR_MODEL = process.env.GROQ_OCR_MODEL || 'qwen/qwen3.8-27b';
+
+// ── Admin Credentials ─────────────────────────────────────────────────────────
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@esummit.in';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2027';
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || crypto.randomBytes(32).toString('hex');
+
+// Simple admin JWT token generation & verification (no external dep needed)
+function generateAdminToken(email) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    email,
+    role: 'admin',
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', ADMIN_JWT_SECRET)
+    .update(`${header}.${payload}`)
+    .digest('base64url');
+  return `${header}.${payload}.${signature}`;
+}
+
+function verifyAdminToken(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, payload, signature] = parts;
+    const expectedSig = crypto.createHmac('sha256', ADMIN_JWT_SECRET)
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+    if (signature !== expectedSig) return null;
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
+    if (decoded.role !== 'admin') return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+// Admin auth middleware
+function requireAdminAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Admin authentication required.' });
+  }
+  const decoded = verifyAdminToken(token);
+  if (!decoded) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired admin token.' });
+  }
+  req.adminUser = decoded;
+  next();
+}
+
 // ── In-Memory State & Stores ──────────────────────────────────────────────────
 // For production, these can be mapped to MongoDB or Redis
 const eligibilityStore = new Map(); // userId -> { status, method, email, institution, verifiedAt, updatedAt }
 const emailOtpStore = new Map();    // email -> { otp, expiresAt, attempts, userId, institution }
 const ordersStore = new Map();      // orderId -> orderRecord
 const idempotencyStore = new Map(); // key -> orderId
+const pendingVerificationsStore = new Map(); // verificationId -> verificationRecord
 
-// Recognized institutions list for student verification
-const RECOGNIZED_DOMAINS = [
+// Allowed educational domains checklist for student verification OTP
+const ALLOWED_EMAIL_DOMAINS = [
   'tcetmumbai.in',
   'iitb.ac.in',
   'iitd.ac.in',
+  'iitk.ac.in',
+  'iitm.ac.in',
   'vjti.ac.in',
   'spit.ac.in',
   'djsce.ac.in',
@@ -53,16 +113,22 @@ const RECOGNIZED_DOMAINS = [
   'srmuniv.ac.in',
   'thadomal.edu',
   'kjsce.edu.in',
-  'edu',
-  'ac.in',
+  'coep.ac.in',
+  'pict.edu',
 ];
+
+// Helper to verify if domain is in checklist
+function isDomainAllowed(domain) {
+  if (!domain) return false;
+  const d = domain.toLowerCase();
+  return ALLOWED_EMAIL_DOMAINS.some(allowed => d === allowed || d.endsWith('.' + allowed));
+}
 
 // ── Allowed origins for CORS ──────────────────────────────────────────────────
 const defaultAllowedOrigins = [
   'https://e-summit-seven.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
-  'http://localhost:5174',
 ];
 
 const envFrontendUrl = process.env.FRONTEND_URL;
@@ -144,6 +210,185 @@ async function checkExistingKonfHubRegistration(email, ticketNumericId = KONFHUB
   }
 }
 
+// ── Helper: Groq OCR & AI Generation Detection ─────────────────────────────────
+async function analyzeStudentIdWithGroq(idCardBase64, expectedCollege, expectedId) {
+  if (!GROQ_API_KEY) {
+    return {
+      success: false,
+      isSuspicious: true,
+      reason: 'No Groq API key configured on server. Requires manual review.',
+      error: 'NO_GROQ_API_KEY'
+    };
+  }
+
+  // Ensure base64 data URI format - strip and rebuild if needed
+  let imageUrl = idCardBase64;
+  if (imageUrl.startsWith('data:')) {
+    // Already a data URI, keep as-is
+  } else {
+    // Raw base64 string, prepend the data URI prefix
+    imageUrl = `data:image/jpeg;base64,${imageUrl}`;
+  }
+
+  // Extract just the base64 portion for size validation
+  const base64Data = imageUrl.split(',')[1] || imageUrl;
+  const estimatedSizeBytes = Math.ceil(base64Data.length * 3 / 4);
+  
+  // Groq has a ~20MB payload limit; if image is too large, resize note
+  if (estimatedSizeBytes > 15 * 1024 * 1024) {
+    return {
+      success: false,
+      isSuspicious: true,
+      reason: 'Image file is too large for automated OCR analysis. Sent for manual review.',
+      error: 'IMAGE_TOO_LARGE'
+    };
+  }
+
+  const prompt = `You are an automated forensic document analyst for a university conference.
+Analyze this uploaded student ID card image carefully.
+
+Tasks:
+1. OCR extraction: Extract visible institution/college name, student ID number, student name, and expiration/academic year from the card.
+2. AI-Generation & Fraud Detection: Look for signs that this is an AI-generated image (e.g. Midjourney/Stable Diffusion/DALL-E artifacts, nonsensical text, inconsistent typography, distorted logos, unrealistic textures, warped borders, unnatural hands/faces, synthetic lighting).
+3. Classification & Confidence Scoring:
+   - "genuine": Clear, authentic student ID card with readable college and student details (confidence score: 0.75 - 1.00).
+   - "suspicious": Borderline, blurry, questionable edits, mismatch in college/ID, or possible AI-generated features (confidence score: 0.40 - 0.74).
+   - "spam": Totally unrelated image (selfie, scenery, random photo, meme, blank, advertisement, or obvious fake) that is NOT a student ID card (confidence score: 0.00 - 0.39).
+
+Expected college (if provided): ${expectedCollege || 'Not specified'}
+Expected student ID (if provided): ${expectedId || 'Not specified'}
+
+Respond strictly in valid JSON format only. No markdown, no code fences, no explanation outside JSON:
+{
+  "isAuthentic": true,
+  "isAiGenerated": false,
+  "isSuspicious": false,
+  "confidenceScore": 0.85,
+  "tag": "genuine",
+  "detectedInstitution": "Name of college/university visible on card",
+  "detectedStudentId": "ID number visible on card",
+  "detectedStudentName": "Name visible on card",
+  "suspicionReasons": [],
+  "summary": "Brief summary of analysis"
+}`;
+
+  try {
+    const requestBody = {
+      model: GROQ_OCR_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: { 
+                url: imageUrl,
+                detail: 'high'
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 800
+    };
+
+    console.log(`[Groq OCR] Sending analysis request using model: ${GROQ_OCR_MODEL}`);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errMsg = data?.error?.message || `Groq API responded with status ${response.status}`;
+      console.warn('[Groq OCR] API Error:', errMsg, JSON.stringify(data?.error || {}));
+
+      return {
+        success: false,
+        isSuspicious: true,
+        tag: 'suspicious',
+        confidenceScore: 0.45,
+        reason: `OCR service error (${response.status}): ${errMsg}. Sent for manual verification.`,
+        error: errMsg
+      };
+    }
+
+    const content = data?.choices?.[0]?.message?.content || '{}';
+    let parsed;
+    try {
+      // Strip markdown code fences if the model wraps output in ```json ... ```
+      const cleaned = content.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.warn('[Groq OCR] Failed to parse JSON response, treating as text:', content.substring(0, 200));
+      parsed = {
+        isAuthentic: true,
+        isAiGenerated: false,
+        isSuspicious: false,
+        confidenceScore: 0.5,
+        tag: 'suspicious',
+        summary: content
+      };
+    }
+
+    // Determine normalized confidence score (0 to 1)
+    let score = typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.5;
+    if (score > 1 && score <= 100) score = score / 100; // normalize percentage if returned as 85 instead of 0.85
+    score = Math.max(0, Math.min(1, score));
+
+    // Derive or sanitize tag: 'genuine' | 'suspicious' | 'spam'
+    let tag = (parsed.tag || '').toLowerCase().trim();
+    if (!['genuine', 'suspicious', 'spam'].includes(tag)) {
+      if (parsed.isAiGenerated || score < 0.4) {
+        tag = 'spam';
+      } else if (!parsed.isAuthentic || parsed.isSuspicious || score < 0.75) {
+        tag = 'suspicious';
+      } else {
+        tag = 'genuine';
+      }
+    }
+
+    // If marked genuine but score is low or marked AI-generated, override safely
+    if (tag === 'genuine' && (parsed.isAiGenerated || score < 0.6)) {
+      tag = 'suspicious';
+    }
+
+    parsed.confidenceScore = score;
+    parsed.tag = tag;
+
+    const isSuspicious = tag !== 'genuine';
+
+    console.log(`[Groq OCR] Analysis complete - Tag: ${tag.toUpperCase()}, Score: ${(score * 100).toFixed(0)}%, Authentic: ${parsed.isAuthentic}, AI Generated: ${parsed.isAiGenerated}`);
+
+    return {
+      success: true,
+      tag,
+      confidenceScore: score,
+      isSuspicious,
+      analysis: parsed,
+      reason: isSuspicious ? (parsed.suspicionReasons?.join(', ') || `Flagged as ${tag} with ${(score * 100).toFixed(0)}% confidence score.`) : 'Verified authentic by Groq OCR'
+    };
+  } catch (networkErr) {
+    console.error('[Groq OCR] Network/Fetch exception:', networkErr);
+    return {
+      success: false,
+      isSuspicious: true,
+      tag: 'suspicious',
+      confidenceScore: 0.3,
+      reason: `Groq OCR unreachable: ${networkErr.message}. Sent for manual verification.`,
+      error: networkErr.message
+    };
+  }
+}
+
 // ── Helper: capture ticket on KonfHub ─────────────────────────────────────────
 async function captureKonfHubTicket(name, email, ticketNumericId) {
   const body = {
@@ -219,6 +464,7 @@ app.get('/api/tickets', async (req, res) => {
       slug: t.slug,
       name: t.name,
       price: t.price,
+      originalPrice: t.originalPrice,
       currency: t.currency,
       tag: t.tag,
       shortDescription: t.shortDescription,
@@ -297,12 +543,11 @@ app.post('/api/eligibility/email/start', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid email address.' });
     }
 
-    // Domain check against recognized educational institutions
-    const isEduDomain = RECOGNIZED_DOMAINS.some(d => domain.endsWith(d)) || domain.includes('.edu') || domain.includes('.ac.');
-    if (!isEduDomain) {
+    // Domain check against recognized educational institutions checklist array
+    if (!isDomainAllowed(domain)) {
       return res.status(400).json({
         success: false,
-        message: `Domain "@${domain}" is not in our recognized college domain directory. You can submit your Student ID card below for manual/automated review.`
+        message: `The domain "@${domain}" is not in our approved student institutions checklist. Please use your official college email or upload your student ID card for verification.`
       });
     }
 
@@ -411,14 +656,71 @@ app.post('/api/eligibility/student-id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid ID document format.' });
     }
 
-    // Simulation of OCR automated approval:
-    // If valid format and student details are provided, approve or mark for review
+    const email = getPrimaryEmail(clerkUser) || 'unknown@domain.com';
+    const userName = clerkUser.fullName || clerkUser.firstName || email.split('@')[0];
+    const verificationId = 'VER-' + crypto.randomBytes(5).toString('hex').toUpperCase();
+
+    // Run Groq Multimodal OCR & AI Document Forensic Model
+    const ocrResult = await analyzeStudentIdWithGroq(idCardBase64, collegeName, studentIdNumber);
+    const tag = ocrResult.tag || (ocrResult.isSuspicious ? 'suspicious' : 'genuine');
+    const confidenceScore = typeof ocrResult.confidenceScore === 'number' ? ocrResult.confidenceScore : 0.5;
+
+    if (ocrResult.isSuspicious) {
+      // Flagged as suspicious or spam -> Needs manual admin review
+      const pendingRecord = {
+        verificationId,
+        userId: clerkUser.id,
+        userEmail: email,
+        userName,
+        institution: collegeName,
+        studentIdNumber: studentIdNumber || 'NOT-SPECIFIED',
+        academicYear: academicYear || '2026-2027',
+        idCardBase64,
+        status: 'pending_manual_review',
+        tag,
+        confidenceScore,
+        flaggedSuspicious: true,
+        suspicionReason: ocrResult.reason,
+        aiAnalysis: ocrResult.analysis || null,
+        error: ocrResult.error || null,
+        submittedAt: new Date().toISOString()
+      };
+
+      pendingVerificationsStore.set(verificationId, pendingRecord);
+
+      // Save user state as pending
+      const userEligibility = {
+        status: 'pending',
+        method: 'student_id_upload',
+        institution: collegeName,
+        verificationId,
+        tag,
+        confidenceScore,
+        flaggedSuspicious: true,
+        reason: ocrResult.reason,
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      eligibilityStore.set(clerkUser.id, userEligibility);
+
+      return res.json({
+        success: true,
+        requiresManualReview: true,
+        message: 'Your Student ID has been sent to the Admin Panel for verification.',
+        studentEligibility: userEligibility
+      });
+    }
+
+    // Clean pass - Verified by Groq OCR
     const verifiedRecord = {
-      status: 'verified', // Set to verified directly to let students book immediately
-      method: 'student_id_upload',
+      status: 'verified',
+      method: 'groq_ocr_verified',
       institution: collegeName,
-      studentIdNumber: studentIdNumber || 'PENDING-VERIFY',
+      studentIdNumber: ocrResult.analysis?.detectedStudentId || studentIdNumber || 'VERIFIED',
       academicYear: academicYear || '2026-2027',
+      tag: 'genuine',
+      confidenceScore,
+      ocrSummary: ocrResult.analysis?.summary,
       submittedAt: new Date().toISOString(),
       verifiedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -426,13 +728,142 @@ app.post('/api/eligibility/student-id', async (req, res) => {
 
     eligibilityStore.set(clerkUser.id, verifiedRecord);
 
+    // Also record in verifications store so admin can inspect verified submissions
+    pendingVerificationsStore.set(verificationId, {
+      verificationId,
+      userId: clerkUser.id,
+      userEmail: email,
+      userName,
+      institution: collegeName,
+      studentIdNumber: verifiedRecord.studentIdNumber,
+      academicYear: verifiedRecord.academicYear,
+      idCardBase64,
+      status: 'approved',
+      tag: 'genuine',
+      confidenceScore,
+      flaggedSuspicious: false,
+      suspicionReason: null,
+      aiAnalysis: ocrResult.analysis || null,
+      submittedAt: new Date().toISOString(),
+      reviewedAt: new Date().toISOString(),
+      reviewNotes: 'Automatically approved by AI / OCR'
+    });
+
     return res.json({
       success: true,
-      message: 'Student ID successfully verified! You can now proceed to purchase student passes.',
+      requiresManualReview: false,
+      message: 'Student ID successfully verified by automated OCR! Student passes are unlocked.',
       studentEligibility: verifiedRecord
     });
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Unauthorized: ' + err.message });
+  }
+});
+
+// ── Admin Authentication Endpoint ─────────────────────────────────────────────
+
+// POST /api/admin/login - Authenticate admin with email & password
+app.post('/api/admin/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
+
+    if (email.toLowerCase().trim() !== ADMIN_EMAIL.toLowerCase().trim() || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+
+    const token = generateAdminToken(email);
+    return res.json({
+      success: true,
+      token,
+      email: ADMIN_EMAIL,
+      message: 'Admin authenticated successfully.'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Authentication error: ' + err.message });
+  }
+});
+
+// GET /api/admin/verify-token - Verify if admin token is still valid
+app.get('/api/admin/verify-token', requireAdminAuth, (req, res) => {
+  return res.json({ success: true, email: req.adminUser.email, role: 'admin' });
+});
+
+// ── Admin Panel Verification Endpoints ────────────────────────────────────────
+
+// GET /api/admin/verifications - List all submissions for manual review
+app.get('/api/admin/verifications', requireAdminAuth, async (req, res) => {
+  try {
+    const list = Array.from(pendingVerificationsStore.values()).sort(
+      (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+    );
+    return res.json({
+      success: true,
+      verifications: list
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/admin/verifications/:id/review - Approve or reject manual ID submission
+app.post('/api/admin/verifications/:id/review', requireAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body; // action: 'approve' | 'reject'
+
+    const record = pendingVerificationsStore.get(id);
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Verification record not found.' });
+    }
+
+    if (action === 'approve') {
+      record.status = 'approved';
+      record.reviewedAt = new Date().toISOString();
+      record.reviewNotes = notes || 'Manually approved by administrator';
+
+      const verifiedRecord = {
+        status: 'verified',
+        method: 'manual_admin_approved',
+        institution: record.institution,
+        studentIdNumber: record.studentIdNumber,
+        academicYear: record.academicYear,
+        verifiedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      eligibilityStore.set(record.userId, verifiedRecord);
+      pendingVerificationsStore.set(id, record);
+
+      return res.json({
+        success: true,
+        message: `Student verification for ${record.userEmail} approved! Student discounts unlocked.`
+      });
+    } else {
+      record.status = 'rejected';
+      record.reviewedAt = new Date().toISOString();
+      record.reviewNotes = notes || 'Rejected by administrator';
+
+      const rejectedRecord = {
+        status: 'rejected',
+        method: 'manual_admin_rejected',
+        reason: notes || 'Student ID was rejected by administrator.',
+        updatedAt: new Date().toISOString()
+      };
+
+      eligibilityStore.set(record.userId, rejectedRecord);
+      pendingVerificationsStore.set(id, record);
+
+      return res.json({
+        success: true,
+        message: `Student verification for ${record.userEmail} rejected.`
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -551,13 +982,15 @@ app.post('/api/orders', async (req, res) => {
 
       // If KonfHub rejects capture because this pass requires online payment gateway checkout:
       if (ticketConfig.price > 0) {
-        const checkoutUrl = `https://konfhub.com/widget/id/38580027-52e6-43dc-b984-7b86d3a7b56c?ticket_id=${numericTicketId}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`;
+        const baseWidget = ticketConfig.konfhubWidgetUrl || 'https://konfhub.com/widget/id/38580027-52e6-43dc-b984-7b86d3a7b56c';
+        const separator = baseWidget.includes('?') ? '&' : '?';
+        const checkoutUrl = `${baseWidget}${separator}email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`;
         return res.status(200).json({
           success: true,
           requiresPaymentGateway: true,
           checkoutUrl,
           ticket: ticketConfig,
-          message: 'Redirecting to secure KonfHub checkout to complete payment...'
+          message: 'Opening secure checkout for ' + ticketConfig.name + '...'
         });
       }
 
