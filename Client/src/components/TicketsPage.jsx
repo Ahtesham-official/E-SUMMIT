@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
+import { tickets as ticketCatalogue } from '../data/tickets';
 import {
-  Ticket,
   ShieldCheck,
   Sparkles,
   ArrowRight,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
   Lock,
   GraduationCap,
   ChevronRight,
-  Filter,
   Check
 } from 'lucide-react';
 import TicketDetailModal from './TicketDetailModal';
@@ -22,16 +18,15 @@ const TicketsPage = () => {
   const {
     isSignedIn,
     currentUserEmail,
-    currentUserName,
     isTCETStudent,
     loginWithClerk,
     getClerkToken,
     isLoaded,
   } = useAuth();
 
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState('');
+  const [eligibilityError, setEligibilityError] = useState('');
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [eligibilityEmail, setEligibilityEmail] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all'); // 'all' | 'student' | 'pro' | 'pitch'
   const [studentEligibility, setStudentEligibility] = useState(null);
@@ -45,42 +40,89 @@ const TicketsPage = () => {
   const [checkoutUrl, setCheckoutUrl] = useState('');
   const [clerkToken, setClerkToken] = useState(null);
 
-  // Fetch tickets and verification status
+  const fetchEligibility = useCallback(async () => {
+    if (!isSignedIn) return null;
+    const token = await getClerkToken();
+    if (!token) throw new Error('Could not get an authentication token.');
+
+    const res = await apiService.getEligibilityStatus(token);
+    if (!res.data?.success) {
+      throw new Error(res.data?.message || 'Failed to load student verification status.');
+    }
+
+    return { token, email: currentUserEmail, eligibility: res.data };
+  }, [currentUserEmail, getClerkToken, isSignedIn]);
+
   useEffect(() => {
-    loadTicketsAndEligibility();
-  }, [isSignedIn, isTCETStudent]);
+    let cancelled = false;
+    fetchEligibility()
+      .then((result) => {
+        if (!result || cancelled) return;
+        setClerkToken(result.token);
+        setEligibilityEmail(result.email);
+        setStudentEligibility(result.eligibility);
+        setEligibilityError('');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('Student eligibility fetch error:', err.message);
+        setStudentEligibility(null);
+        setEligibilityError('Unable to load student verification status. Student discounts may require verification.');
+      });
 
-  const loadTicketsAndEligibility = async () => {
-    setLoading(true);
-    setPageError('');
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchEligibility]);
+
+  const retryEligibility = async () => {
+    setEligibilityLoading(true);
     try {
-      let token = null;
-      if (isSignedIn) {
-        token = await getClerkToken();
-        setClerkToken(token);
-      }
-
-      // Load tickets from authoritative backend API
-      const res = await apiService.getTickets(token);
-      if (res.data?.success) {
-        setTickets(res.data.tickets || []);
-        if (res.data.studentEligibility) {
-          setStudentEligibility(res.data.studentEligibility);
-        }
-      } else {
-        throw new Error(res.data?.message || 'Failed to fetch tickets.');
+      const result = await fetchEligibility();
+      if (result) {
+        setClerkToken(result.token);
+        setEligibilityEmail(result.email);
+        setStudentEligibility(result.eligibility);
+        setEligibilityError('');
       }
     } catch (err) {
-      console.warn('Backend ticket fetch error:', err.message);
-      setPageError('Unable to load ticket catalogue. Please check backend connection.');
+      console.warn('Student eligibility fetch error:', err.message);
+      setStudentEligibility(null);
+      setEligibilityError('Unable to load student verification status. Student discounts may require verification.');
     } finally {
-      setLoading(false);
+      setEligibilityLoading(false);
     }
   };
 
+  const tickets = ticketCatalogue.filter((ticket) =>
+    isTCETStudent ? ticket.eligibility.tcetOnly : !ticket.eligibility.tcetOnly
+  );
+
+  const currentStudentEligibility =
+    isSignedIn && eligibilityEmail === currentUserEmail ? studentEligibility : null;
+  const currentClerkToken =
+    isSignedIn && eligibilityEmail === currentUserEmail ? clerkToken : null;
   const isStudentVerified =
     isTCETStudent ||
-    (studentEligibility && studentEligibility.status === 'verified');
+    (currentStudentEligibility && currentStudentEligibility.status === 'verified');
+
+  const openVerificationModal = async () => {
+    if (!isSignedIn) {
+      loginWithClerk();
+      return;
+    }
+
+    const token = await getClerkToken();
+    if (!token) {
+      setEligibilityError('Unable to verify your session. Please sign in again and retry.');
+      return;
+    }
+
+    setClerkToken(token);
+    setEligibilityEmail(currentUserEmail);
+    setDetailModalOpen(false);
+    setVerificationModalOpen(true);
+  };
 
   const handleCardClick = (ticket) => {
     setSelectedTicket(ticket);
@@ -196,11 +238,11 @@ const TicketsPage = () => {
                   </span>
                 ) : isStudentVerified ? (
                   <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300">
-                    <GraduationCap className="w-3.5 h-3.5" /> Student Verified ({studentEligibility?.institution || 'Enrolled'})
+                    <GraduationCap className="w-3.5 h-3.5" /> Student Verified ({currentStudentEligibility?.institution || 'Enrolled'})
                   </span>
                 ) : (
                   <button
-                    onClick={() => setVerificationModalOpen(true)}
+                    onClick={openVerificationModal}
                     className="redBg text-white px-3 py-1 rounded-full font-bold hover:opacity-95 transition-opacity flex items-center gap-1 shadow-sm"
                   >
                     <GraduationCap className="w-3.5 h-3.5" /> Verify Student Status for Discounts
@@ -258,57 +300,46 @@ const TicketsPage = () => {
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <Loader2 className="w-10 h-10 text-[#C0202A] animate-spin" />
-            <p className="text-sm font-semibold text-[#0E2044]">Loading verified pass catalogue...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {!loading && pageError && (
-          <div className="max-w-md mx-auto my-12 p-6 bg-red-50 border border-red-200 rounded-3xl text-center space-y-3">
-            <AlertCircle className="w-8 h-8 text-red-600 mx-auto" />
-            <h3 className="text-base font-bold text-red-900">Failed to Load Passes</h3>
-            <p className="text-xs text-red-700">{pageError}</p>
+        {eligibilityError && (
+          <div className="max-w-2xl mx-auto mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 text-xs text-amber-900">
+            <span>{eligibilityError}</span>
             <button
-              onClick={loadTicketsAndEligibility}
-              className="redBg text-white px-5 py-2 rounded-xl text-xs font-bold hover:opacity-90 shadow"
+              onClick={retryEligibility}
+              disabled={eligibilityLoading}
+              className="shrink-0 redBg text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 disabled:opacity-50"
             >
-              Retry
+              {eligibilityLoading ? 'Retrying…' : 'Retry'}
             </button>
           </div>
         )}
 
         {/* Ticket Cards Grid */}
-        {!loading && !pageError && (
-          filteredTickets.length === 0 ? (
-            <div className="text-center py-16 text-gray-500 text-sm">
-              No tickets found in this category.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-10">
-              {filteredTickets.map((t) => {
-                const requiresVerification = t.requiresStudentVerification && !isStudentVerified;
-                const isTCETPass = t.eligibility.tcetOnly;
+        {filteredTickets.length === 0 ? (
+          <div className="text-center py-16 text-gray-500 text-sm">
+            No tickets found in this category.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-10">
+            {filteredTickets.map((t) => {
+              const requiresVerification = t.requiresStudentVerification && !isStudentVerified;
+              const isTCETPass = t.eligibility.tcetOnly;
 
-                return (
-                  <div
-                    key={t.slug}
-                    onClick={() => handleCardClick(t)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(t); }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`Select ${t.name}`}
-                    className={`group relative flex flex-col justify-between bg-[#FDFDFE] border rounded-3xl p-6 sm:p-7 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1.5 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#C0202A] ${
-                      isTCETPass
-                        ? 'border-emerald-300 ring-2 ring-emerald-500/20'
-                        : t.tag?.includes('Popular')
-                        ? 'border-red-300 ring-2 ring-red-500/20'
-                        : 'border-gray-200'
-                    }`}
-                  >
+              return (
+                <div
+                  key={t.slug}
+                  onClick={() => handleCardClick(t)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(t); }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Select ${t.name}`}
+                  className={`group relative flex flex-col justify-between bg-[#FDFDFE] border rounded-3xl p-6 sm:p-7 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1.5 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#C0202A] ${
+                    isTCETPass
+                      ? 'border-emerald-300 ring-2 ring-emerald-500/20'
+                      : t.tag?.includes('Popular')
+                      ? 'border-red-300 ring-2 ring-red-500/20'
+                      : 'border-gray-200'
+                  }`}
+                >
                     {/* Top Tag & Badge */}
                     <div className="flex items-center justify-between mb-4">
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
@@ -375,11 +406,10 @@ const TicketsPage = () => {
                       <span>View Inclusions &amp; Book</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -392,10 +422,7 @@ const TicketsPage = () => {
         }}
         ticket={selectedTicket}
         onPurchase={handlePurchase}
-        onOpenVerification={() => {
-          setDetailModalOpen(false);
-          setVerificationModalOpen(true);
-        }}
+        onOpenVerification={openVerificationModal}
         isStudentVerified={isStudentVerified}
         isTCETStudent={isTCETStudent}
         purchaseLoading={purchaseLoading}
@@ -410,7 +437,7 @@ const TicketsPage = () => {
         isOpen={verificationModalOpen}
         onClose={() => setVerificationModalOpen(false)}
         onSuccess={handleVerificationSuccess}
-        clerkToken={clerkToken}
+        clerkToken={currentClerkToken}
         currentEmail={currentUserEmail}
       />
     </div>

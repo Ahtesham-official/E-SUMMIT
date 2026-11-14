@@ -21,7 +21,7 @@ const MainPage = ({ loading, onRegisterClick }) => (
     <Hero animate={!loading} onRegisterClick={onRegisterClick} />
     <WhatToExpect />
     <Speakers />
-    <ScheduleAndPartners />
+    <ScheduleAndPartners onRegisterClick={onRegisterClick} />
   </main>
 )
 
