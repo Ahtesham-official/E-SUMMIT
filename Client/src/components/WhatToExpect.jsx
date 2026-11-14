@@ -183,7 +183,11 @@ const WhatToExpect = () => {
   return (
     <section
       id="what-to-expect"
-      className="w-full bg-[#E8DDDC] flex flex-col justify-center px-4 sm:px-8 md:px-16 py-16 md:py-24 border-t border-gray-200"
+      className="relative z-20 w-full bg-[#E8DDDC] flex flex-col justify-center px-4 sm:px-8 md:px-16 py-16 md:py-24"
+      style={{
+        borderRadius: '2.5rem 2.5rem 2.5rem 2.5rem',
+        boxShadow: '0 -16px 40px rgba(14,32,68,0.16), 0 -3px 10px rgba(14,32,68,0.09), 0 16px 40px rgba(14,32,68,0.16), 0 3px 10px rgba(14,32,68,0.09)',
+      }}
     >
       <div className="max-w-7xl mx-auto w-full">
         {/* Section Header */}
@@ -228,17 +232,15 @@ const WhatToExpect = () => {
                 <button
                   key={tab.id}
                   onClick={() => setSelectedCategory(tab.id)}
-                  className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-                    isActive
-                      ? 'bg-[#0E2044] text-white shadow-md'
-                      : 'text-gray-600 hover:text-[#0E2044] hover:bg-white/60'
-                  }`}
+                  className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${isActive
+                    ? 'bg-[#0E2044] text-white shadow-md'
+                    : 'text-gray-600 hover:text-[#0E2044] hover:bg-white/60'
+                    }`}
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-colors ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-colors ${isActive ? 'bg-white/20 text-white' : 'bg-gray-200/80 text-gray-700'
+                      }`}
                   >
                     {tab.count}
                   </span>

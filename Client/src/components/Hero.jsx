@@ -38,7 +38,10 @@ const Hero = ({ animate, onRegisterClick }) => {
   }, [animate]);
 
   return (
-    <section id="hero" className="relative w-full min-h-screen h-auto sm:h-screen flex flex-col justify-center px-4 sm:px-10 md:px-16 overflow-hidden pt-[12vh] sm:pt-[10vh] pb-10 sm:pb-0">
+    <section
+      id="hero"
+      className="relative w-full min-h-screen h-auto sm:h-screen flex flex-col justify-center px-4 sm:px-10 md:px-16 overflow-hidden pt-[12vh] sm:pt-[10vh] pb-10 sm:pb-0"
+    >
       {/* Background large 27 */}
       <div className="absolute top-0 right-0 w-full md:w-1/2 h-full flex justify-center items-center opacity-20 z-[-1] pointer-events-none">
         <h1 className="text-[50vw] md:text-[35vw] font-bold text-transparent bg-clip-text bg-gradient-to-br from-[#E0B09D] to-[#E8E9F2]">27</h1>

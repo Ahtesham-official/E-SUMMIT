@@ -69,7 +69,11 @@ const FooterSection = () => {
   return (
     <footer
       id="footer-section"
-      className="relative z-10 w-full bg-[#f6eae2]/95 border-t border-[#ebdcd5] text-[#0c1938] overflow-hidden mt-auto"
+      className="relative z-10 w-full bg-[#f6eae2]/95 text-[#0c1938] overflow-hidden mt-auto"
+      style={{
+        borderRadius: '2.5rem 2.5rem 0 0',
+        boxShadow: '0 -16px 40px rgba(14,32,68,0.16), 0 -3px 10px rgba(14,32,68,0.09)',
+      }}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6">
         {/* 1. COMPACT CONTACT BLOCK */}
@@ -408,6 +412,38 @@ const FooterSection = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* DEVELOPED BY */}
+          <div className="pt-4 border-t border-[#ebdcd5] text-center text-[11px] text-[#0c1938]/60 pb-2">
+            <span>Developed by&nbsp;:&nbsp;</span>
+            <a
+              href="http://ahtesham-official.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#0c1938]/80 hover:text-[#e11d48] transition-colors"
+            >
+              Ahtesham Shaikh <span className="font-normal">(Web Developer)</span>
+            </a>
+            <span className="mx-1.5 text-[#0c1938]/30">·</span>
+            <a
+              href="https://www.linkedin.com/in/shirin-shaikh-761930288/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#0c1938]/80 hover:text-[#e11d48] transition-colors"
+            >
+              Shirin Shaikh <span className="font-normal">(Deputy Web Developer)</span>
+            </a>
+            <span className="mx-1.5 text-[#0c1938]/30">·</span>
+            <span>Guided by&nbsp;</span>
+            <a
+              href="https://www.linkedin.com/in/ahana-kulkarni-753939272/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#0c1938]/80 hover:text-[#e11d48] transition-colors"
+            >
+              Ahana Kulkarni
+            </a>
           </div>
 
           {/* 4. BOTTOM COPYRIGHT BAR */}
