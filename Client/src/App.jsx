@@ -7,6 +7,7 @@ import Hero from './components/Hero'
 import WhatToExpect from './components/WhatToExpect'
 import Speakers from './components/Speakers'
 import ScheduleAndPartners from './components/ScheduleAndPartners'
+import FooterSection from './components/FooterSection'
 import LoadingScreen from './components/LoadingScreen'
 import TicketsPage from './components/TicketsPage'
 import AllSpeakersPage from './components/AllSpeakersPage'
@@ -58,7 +59,7 @@ const AppContent = () => {
   const isAdminRoute = location.pathname.startsWith('/admin')
 
   return (
-    <div className='relative w-full overflow-x-hidden scroll-smooth font-sans bg-[#E8DDDC] min-h-screen'>
+    <div className='relative w-full overflow-x-hidden scroll-smooth font-sans bg-[#E8DDDC] min-h-screen flex flex-col'>
       {!isAdminRoute && <BackgroundCircles />}
       {!isAdminRoute && loading && <LoadingScreen onComplete={() => setLoading(false)} />}
 
@@ -69,13 +70,17 @@ const AppContent = () => {
         />
       )}
 
-      <Routes>
-        <Route path="/" element={<MainPage loading={loading} onRegisterClick={handleRegisterClick} />} />
-        <Route path="/tickets" element={<TicketsPage />} />
-        <Route path="/speakers" element={<AllSpeakersPage />} />
-        <Route path="/my-tickets" element={<MyTicketsPage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-      </Routes>
+      <div className='flex-1'>
+        <Routes>
+          <Route path="/" element={<MainPage loading={loading} onRegisterClick={handleRegisterClick} />} />
+          <Route path="/tickets" element={<TicketsPage />} />
+          <Route path="/speakers" element={<AllSpeakersPage />} />
+          <Route path="/my-tickets" element={<MyTicketsPage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+        </Routes>
+      </div>
+
+      {!isAdminRoute && <FooterSection />}
     </div>
   )
 }
